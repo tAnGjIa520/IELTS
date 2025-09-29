@@ -65,14 +65,49 @@ def parse_markdown_table(file_path):
     return words
 
 
-def generate_quiz(words, mode='en2zh', output_file='quiz.md'):
+def parse_range(range_str):
+    """解析范围字符串，如 '1-99' 返回 (1, 99)，'50' 返回 (1, 50)"""
+    if not range_str:
+        return None, None
+
+    try:
+        if '-' in range_str:
+            start, end = range_str.split('-', 1)
+            return int(start.strip()), int(end.strip())
+        else:
+            # 如果只有一个数字，表示从第1题到第N题
+            num = int(range_str.strip())
+            return 1, num
+    except ValueError:
+        print(f"错误: 无效的范围格式 '{range_str}'，请使用 '1-99' 或 '50' 格式")
+        return None, None
+
+
+def generate_quiz(words, mode='en2zh', output_file='quiz.md', word_range=None):
     """生成测试题并输出到markdown文件"""
     if not words:
         print("错误: 没有找到有效的单词数据")
         return
 
+    # 根据范围筛选单词
+    if word_range:
+        start, end = word_range
+        if start is not None and end is not None:
+            # 验证范围有效性
+            if start < 1 or end > len(words) or start > end:
+                print(f"错误: 范围 {start}-{end} 超出有效范围 1-{len(words)}")
+                return
+
+            # 选择指定范围的单词 (转换为0-based index)
+            selected_words = words[start-1:end]
+            print(f"选择范围: {start}-{end} (共{len(selected_words)}个单词)")
+        else:
+            return
+    else:
+        selected_words = words.copy()
+
     # 随机打乱单词顺序
-    shuffled_words = words.copy()
+    shuffled_words = selected_words.copy()
     random.shuffle(shuffled_words)
 
     # 确定模式名称
@@ -164,6 +199,8 @@ def main():
     parser.add_argument('--output', '-o',
                        default='quiz.md',
                        help='输出文件名 (默认: quiz.md)')
+    parser.add_argument('--range', '-r',
+                       help='题目范围，格式: 1-99 或 50 (默认: 全部题目)')
 
     args = parser.parse_args()
 
@@ -181,9 +218,18 @@ def main():
 
     print(f"成功读取 {len(words)} 个单词")
 
+    # 解析范围参数
+    word_range = None
+    if args.range:
+        start, end = parse_range(args.range)
+        if start is not None and end is not None:
+            word_range = (start, end)
+        else:
+            sys.exit(1)
+
     # 生成测试题
     output_path = os.path.join(script_dir, args.output)
-    generate_quiz(words, args.mode, output_path)
+    generate_quiz(words, args.mode, output_path, word_range)
 
 
 if __name__ == '__main__':
